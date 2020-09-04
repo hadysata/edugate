@@ -3,6 +3,7 @@
         "KHTML",
         "apng",
         "idcl",
+        "itertools",
         "stree",
         "webp"
     ]

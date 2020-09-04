@@ -1,8 +1,10 @@
 import requests
 import re
 from bs4 import BeautifulSoup
+from time import sleep
+import json
 
-target = "https://edugate.ksu.edu.sa/ksu/ui/guest/timetable/index/scheduleTreeCoursesIndex.faces"
+target = "https://edugate.yu.edu.sa/yu/ui/guest/timetable/index/scheduleTreeCoursesIndex.faces"
 
 cookie = ""
 
@@ -22,9 +24,17 @@ def headers():
 def cookiesToString(cookie):
     return "; ".join([str(x)+"="+str(y) for x,y in cookie.items()])
 
-def get(targetUrl = target , payload = []):
-    requestData = requests.post(target , data=payload ,headers=headers())
-    # setCookies(requestData.cookies)
+def get(targetUrl = target , payload = [] , attempt = 1):
+    requestData = None
+    try:
+     requestData = requests.post(target , data=payload ,headers=headers())
+    except:
+        print("Erroorrrrrrr")
+        if(attempt < 3):
+            sleep(attempt * 5)
+            get(targetUrl , payload)
+        else:
+            return 0
     return requestData
 
 def getCookies(page):
@@ -115,8 +125,8 @@ def getMajorCourses(majorIndex , select1 , select2):
     params.append(('myForm:select1' , select1))
     params.append(('myForm:select2' , select2))
     params.append(('myForm:index' , majorIndex))
-    params.append(('myForm:_idcl' , 'myForm:commandLink'))
-
+    params.append(('myForm:commandLink' , 'myForm:commandLink'))
+    #TODO: Get the commandLink value
     page = get(payload=params)
 
     soup = BeautifulSoup(page.content, 'html.parser')
@@ -124,8 +134,8 @@ def getMajorCourses(majorIndex , select1 , select2):
     rows = soup.findAll('tr', {"class": re.compile('^ROW')})
 
     for row in rows:
-        data = list(filter(None, row.text.splitlines()))
-        coursesList.append({'code': data[0] , 'name': data[1] , 'credits': data[4]})
+        data =  row.text.splitlines()
+        coursesList.append({'code': data[1] , 'name': data[2] , 'credits': data[5]})
     
     return removeDuplicate(coursesList)
 
@@ -142,10 +152,51 @@ def init():
 
 #  print(getMajorCourses(46 , 1 , 11))
  
- print(getMajors(551 , 455))
+#  print(getMajors(551 , 455))
 
+def worker():
+    global formOptions
+    global univerityCourses
+
+    select1List = []
+    select2List = []
+
+    for value in formOptions:
+        if(value['optionId'] == 'myForm:select1'):
+            select1List = value['list']
+        elif(value['optionId'] == 'myForm:select2'):
+            select2List = value['list']
+    
+    for select1 in select1List:
+        for select2 in select2List:
+            majors = getMajors(select1 , select2)
+            for major in majors:
+                univerityCourses.extend(downloader(major , select1 , select2))
+                autoSave() 
+
+    univerityCourses = removeDuplicate(univerityCourses)
+    print('Total of {} courses found in this target'.format(len(univerityCourses)))
+    save()
+
+def downloader(major , select1 , select2):
+    print('downloading {} Courses...'.format(major['code']))
+    coursesList = getMajorCourses(major['index'] , select1 , select2)
+    print('{} courses found in {}'.format(len(coursesList) , major['code']))
+    return coursesList
+
+def save():
+    global univerityCourses
+    with open('data.json', 'w+', encoding='utf-8') as f:
+      json.dump(univerityCourses, f, ensure_ascii=False)
+
+def autoSave():
+    global univerityCourses
+    with open('data.json', 'a+', encoding='utf-8') as f:
+      json.dump(univerityCourses, f, ensure_ascii=False)
 
 init()
+worker()
+
 # print(hiddenValues)
 
 
