@@ -3,6 +3,7 @@
         "KHTML",
         "apng",
         "avif",
+        "gmtime",
         "idcl",
         "itertools",
         "stree",
